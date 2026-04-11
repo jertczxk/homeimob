@@ -14,6 +14,21 @@ export interface BuscarImoveisParams {
   cidade?: string
 }
 
+interface ImovelQueryRow {
+  slug: string
+  titulo: string
+  tipo: string
+  finalidade: string
+  preco: number | null
+  quartos: number
+  banheiros: number
+  vagas: number
+  area_m2: number | null
+  bairro: string | null
+  cidade: string | null
+  imovel_fotos: { url: string; ordem: number }[]
+}
+
 export async function executeBuscarImoveis(params: BuscarImoveisParams) {
   const supabase = await createClient()
 
@@ -38,7 +53,7 @@ export async function executeBuscarImoveis(params: BuscarImoveisParams) {
   if (error) return { erro: error.message }
   if (!data || data.length === 0) return { resultado: 'Nenhum imóvel encontrado com esses critérios.' }
 
-  const imoveis = (data as any[]).map((im) => {
+  const imoveis = (data as ImovelQueryRow[]).map((im: ImovelQueryRow) => {
     const fotos = (im.imovel_fotos ?? []) as { url: string; ordem: number }[]
     fotos.sort((a, b) => a.ordem - b.ordem)
     return {
@@ -67,9 +82,13 @@ export interface BuscarConhecimentoParams {
 }
 
 export function executeBuscarConhecimento(_params: BuscarConhecimentoParams): object {
-  const filePath = join(process.cwd(), 'src', 'data', 'conhecimento.md')
-  const content = readFileSync(filePath, 'utf-8')
-  return { conteudo: content }
+  try {
+    const filePath = join(process.cwd(), 'src', 'data', 'conhecimento.md')
+    const content = readFileSync(filePath, 'utf-8')
+    return { conteudo: content }
+  } catch {
+    return { erro: 'Base de conhecimento não disponível.' }
+  }
 }
 
 // ── Tool: registrar_simulacao ───────────────────────────────────────────────
