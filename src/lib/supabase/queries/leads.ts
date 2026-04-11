@@ -51,3 +51,13 @@ export async function getLeadInteractions(leadId: string): Promise<LeadInteracti
   if (error) throw new Error(error.message)
   return (data ?? []) as LeadInteraction[]
 }
+
+export async function getAllLeadInteractions(): Promise<LeadInteraction[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('lead_interactions')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as LeadInteraction[]
+}
