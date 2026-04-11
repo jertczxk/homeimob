@@ -1,10 +1,11 @@
 'use client'
 
-import { LeadStage, Lead, LeadPriority } from '@/types'
+import { LeadStage, Lead, LeadPriority, LeadInteraction } from '@/types'
 import { useAdminStore } from '@/store/admin-store'
 import { cn } from '@/lib/utils'
 import { Phone, Mail, GripVertical, MoreHorizontal, Calendar, Tag } from 'lucide-react'
-import { useState, DragEvent } from 'react'
+import { useState, useTransition, DragEvent } from 'react'
+import { moveLeadToStage } from '@/app/(admin)/admin/crm/actions'
 
 // ─── Stage Config ────────────────────────────────────────
 
@@ -51,7 +52,6 @@ function KanbanCard({ lead }: { lead: Lead }) {
             onClick={() => selectLead(lead.id)}
             className="bg-zinc-800/80 rounded-xl border border-white/5 p-3.5 cursor-pointer hover:border-accent/20 hover:bg-zinc-800 transition-all duration-200 group"
         >
-            {/* Header */}
             <div className="flex items-start justify-between mb-2.5">
                 <div className="flex items-center gap-2 min-w-0">
                     <GripVertical className="h-3.5 w-3.5 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab shrink-0" />
@@ -67,7 +67,6 @@ function KanbanCard({ lead }: { lead: Lead }) {
                 </button>
             </div>
 
-            {/* Info */}
             <div className="space-y-1.5 ml-[38px]">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded', priorityConfig[lead.prioridade].color)}>
@@ -104,8 +103,15 @@ function KanbanCard({ lead }: { lead: Lead }) {
 
 // ─── Kanban Column ───────────────────────────────────────
 
-function KanbanColumn({ stage, leads }: { stage: LeadStage; leads: Lead[] }) {
-    const { moveLeadToStage } = useAdminStore()
+function KanbanColumn({
+    stage,
+    leads,
+    onDrop,
+}: {
+    stage: LeadStage
+    leads: Lead[]
+    onDrop: (leadId: string, stage: LeadStage) => void
+}) {
     const [isDragOver, setIsDragOver] = useState(false)
     const config = stageConfig[stage]
 
@@ -121,9 +127,7 @@ function KanbanColumn({ stage, leads }: { stage: LeadStage; leads: Lead[] }) {
         e.preventDefault()
         setIsDragOver(false)
         const leadId = e.dataTransfer.getData('text/plain')
-        if (leadId) {
-            moveLeadToStage(leadId, stage)
-        }
+        if (leadId) onDrop(leadId, stage)
     }
 
     return (
@@ -136,10 +140,9 @@ function KanbanColumn({ stage, leads }: { stage: LeadStage; leads: Lead[] }) {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            {/* Column Header */}
-            <div className={cn('flex items-center justify-between px-4 py-4 border-b border-white/5 sticky top-0 bg-zinc-900/80 backdrop-blur-sm rounded-t-2xl z-10')}>
+            <div className="flex items-center justify-between px-4 py-4 border-b border-white/5 sticky top-0 bg-zinc-900/80 backdrop-blur-sm rounded-t-2xl z-10">
                 <div className="flex items-center gap-2">
-                    <div className={cn('w-2.5 h-2.5 rounded-full shadow-sm', config.bg, config.color.replace('text-', 'bg-'))} />
+                    <div className={cn('w-2.5 h-2.5 rounded-full', config.bg, config.color.replace('text-', 'bg-'))} />
                     <span className={cn('text-xs font-bold uppercase tracking-wider', config.color)}>{config.label}</span>
                 </div>
                 <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border border-current', config.bg, config.color)}>
@@ -147,7 +150,6 @@ function KanbanColumn({ stage, leads }: { stage: LeadStage; leads: Lead[] }) {
                 </span>
             </div>
 
-            {/* Cards */}
             <div className="flex-1 p-3 space-y-3 pb-6">
                 {leads.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-[10px] uppercase font-bold tracking-widest text-zinc-600 border border-dashed border-white/10 rounded-xl bg-white/[0.01]">
@@ -163,10 +165,10 @@ function KanbanColumn({ stage, leads }: { stage: LeadStage; leads: Lead[] }) {
 
 // ─── Lead Detail Panel ───────────────────────────────────
 
-function LeadDetailPanel() {
-    const { leads, interactions, selectedLeadId, closeDetailPanel, detailPanelOpen } = useAdminStore()
+function LeadDetailPanel({ leads, allInteractions }: { leads: Lead[]; allInteractions: LeadInteraction[] }) {
+    const { selectedLeadId, detailPanelOpen, closeDetailPanel } = useAdminStore()
     const lead = leads.find(l => l.id === selectedLeadId)
-    const leadInteractions = interactions.filter(i => i.lead_id === selectedLeadId)
+    const leadInteractions = allInteractions.filter(i => i.lead_id === selectedLeadId)
 
     if (!detailPanelOpen || !lead) return null
 
@@ -181,30 +183,18 @@ function LeadDetailPanel() {
 
     return (
         <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 bg-black/40 z-40"
-                onClick={closeDetailPanel}
-            />
-            {/* Panel */}
+            <div className="fixed inset-0 bg-black/40 z-40" onClick={closeDetailPanel} />
             <div className="fixed top-0 right-0 w-full max-w-md h-screen bg-zinc-900 border-l border-white/5 z-50 overflow-y-auto animate-in slide-in-from-right-8">
                 <div className="p-6">
-                    {/* Header */}
                     <div className="flex items-start justify-between mb-6">
                         <div>
                             <h3 className="text-lg font-bold text-white">{lead.nome}</h3>
                             <p className="text-sm text-zinc-500 mt-0.5">{lead.telefone}</p>
                             {lead.email && <p className="text-sm text-zinc-500">{lead.email}</p>}
                         </div>
-                        <button
-                            onClick={closeDetailPanel}
-                            className="text-zinc-500 hover:text-white transition-colors text-xl leading-none"
-                        >
-                            ×
-                        </button>
+                        <button onClick={closeDetailPanel} className="text-zinc-500 hover:text-white transition-colors text-xl leading-none">×</button>
                     </div>
 
-                    {/* Stage Badge */}
                     <div className="flex items-center gap-2 mb-6">
                         <span className={cn('text-xs font-bold px-2.5 py-1 rounded-lg', stageConfig[lead.stage].bg, stageConfig[lead.stage].color)}>
                             {stageConfig[lead.stage].label}
@@ -214,7 +204,6 @@ function LeadDetailPanel() {
                         </span>
                     </div>
 
-                    {/* Details */}
                     <div className="space-y-4 bg-zinc-800/50 rounded-xl p-4 border border-white/5 mb-6">
                         <Detail label="Interesse" value={`${lead.interesse} · ${lead.tipoInteresse || '—'}`} />
                         <Detail label="Bairro" value={lead.bairroInteresse || '—'} />
@@ -228,7 +217,6 @@ function LeadDetailPanel() {
                         {lead.notas && <Detail label="Notas" value={lead.notas} />}
                     </div>
 
-                    {/* Timeline */}
                     <div>
                         <p className="text-sm font-semibold text-white mb-4">Histórico</p>
                         <div className="space-y-4">
@@ -260,7 +248,6 @@ function LeadDetailPanel() {
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="mt-6 flex gap-2">
                         <button className="flex-1 bg-accent text-accent-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors">
                             Registrar Contato
@@ -286,9 +273,24 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 // ─── Kanban Board (main) ─────────────────────────────────
 
-export function KanbanBoard() {
-    const { leads } = useAdminStore()
+export function KanbanBoard({
+    initialLeads,
+    initialInteractions,
+}: {
+    initialLeads: Lead[]
+    initialInteractions: LeadInteraction[]
+}) {
+    const [leads, setLeads] = useState<Lead[]>(initialLeads)
+    const [, startTransition] = useTransition()
     const stages: LeadStage[] = ['lead', 'atendimento', 'visita', 'proposta', 'negociacao', 'fechamento']
+
+    function handleDrop(leadId: string, stage: LeadStage) {
+        // Optimistic update
+        setLeads(prev => prev.map(l =>
+            l.id === leadId ? { ...l, stage, updated_at: new Date().toISOString() } : l
+        ))
+        startTransition(() => moveLeadToStage(leadId, stage))
+    }
 
     return (
         <div className="h-full flex flex-col">
@@ -299,11 +301,12 @@ export function KanbanBoard() {
                             key={stage}
                             stage={stage}
                             leads={leads.filter(l => l.stage === stage)}
+                            onDrop={handleDrop}
                         />
                     ))}
                 </div>
             </div>
-            <LeadDetailPanel />
+            <LeadDetailPanel leads={leads} allInteractions={initialInteractions} />
         </div>
     )
 }

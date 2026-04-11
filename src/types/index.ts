@@ -159,3 +159,136 @@ export interface Atividade {
     descricao: string
     created_at: string
 }
+
+// ─── Repasse Types ───────────────────────────────────────
+
+export interface Repasse {
+    id: string
+    contrato_id: string
+    mes_referencia: string
+    valor_bruto: number
+    taxa_administracao: number
+    valor_liquido: number
+    data_repasse: string | null
+    status: 'pendente' | 'realizado' | 'cancelado'
+    created_at: string
+}
+
+// ─── Manutencao Types ────────────────────────────────────
+
+export interface Manutencao {
+    id: string
+    imovel_id: string
+    titulo: string
+    descricao: string | null
+    status: 'aberta' | 'em_andamento' | 'concluida' | 'cancelada'
+    custo: number | null
+    data_abertura: string
+    data_conclusao: string | null
+    created_at: string
+}
+
+// ─── Vistoria Types ──────────────────────────────────────
+
+export interface Vistoria {
+    id: string
+    contrato_id: string
+    tipo: 'entrada' | 'saida' | 'periodica'
+    data: string
+    laudo: string | null
+    created_at: string
+}
+
+// ─── Proposta Types ──────────────────────────────────────
+
+export interface Proposta {
+    id: string
+    imovel_id: string | null
+    comprador_id: string | null
+    proprietario_id: string | null
+    imovel_descricao: string | null
+    comprador_nome: string | null
+    proprietario_nome: string | null
+    valor_pedido: number
+    valor_oferta: number
+    contraproposta: number | null
+    data: string
+    validade: string
+    status: 'aguardando' | 'contraproposta' | 'aceita' | 'recusada' | 'expirada'
+    corretor: string | null
+    created_at: string
+    updated_at: string
+}
+
+// ─── VisitaVenda Types ───────────────────────────────────
+
+export interface VisitaVenda {
+    id: string
+    lead_id: string | null
+    imovel_id: string | null
+    data: string
+    status: 'agendada' | 'realizada' | 'cancelada'
+    corretor: string | null
+    notas: string | null
+    created_at: string
+}
+
+// ─── Captacao Types ──────────────────────────────────────
+
+export interface Captacao {
+    id: string
+    endereco: string
+    proprietario: string
+    telefone: string
+    tipo: string
+    valor_estimado: number
+    status: 'prospectando' | 'em_avaliacao' | 'autorizado' | 'recusado'
+    corretor: string | null
+    data: string
+    created_at: string
+}
+
+// ─── Extended (join) types ────────────────────────────────
+
+export interface ContratoComDetalhes extends Contrato {
+    imovel: { titulo: string } | null
+    proprietario: { nome: string } | null
+    inquilino: { nome: string } | null
+}
+
+export interface PagamentoComDetalhes extends Pagamento {
+    contrato: {
+        valor_aluguel: number
+        imovel: { titulo: string } | null
+        inquilino: { nome: string } | null
+    } | null
+}
+
+export interface RepasseComDetalhes extends Repasse {
+    contrato: {
+        imovel: { titulo: string } | null
+        inquilino: { nome: string } | null
+    } | null
+}
+
+export interface VistoriaComDetalhes extends Vistoria {
+    contrato: {
+        imovel: { titulo: string } | null
+        inquilino: { nome: string } | null
+    } | null
+}
+
+export interface ManutencaoComDetalhes extends Manutencao {
+    imovel: { titulo: string } | null
+}
+
+export interface PropostaComDetalhes extends Proposta {
+    imovel: { titulo: string; slug: string } | null
+    comprador: { nome: string } | null
+    proprietario: { nome: string } | null
+}
+
+export interface VisitaVendaComDetalhes extends VisitaVenda {
+    lead: { nome: string } | null
+    imovel: { titulo: string; slug: string } | null
+}

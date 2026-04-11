@@ -1,5 +1,3 @@
-"use client"
-
 import { IndicesEconomicos } from '@/components/site/IndicesEconomicos'
 import { ServicosCards } from '@/components/site/ServicosCards'
 import { ImovelCard } from '@/components/site/ImovelCard'
@@ -8,16 +6,13 @@ import { CorretorVirtual } from '@/components/site/CorretorVirtual'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowRight, Building, Home as HomeIcon, Key, TrendingUp, Users, Building2, Award, Calendar } from 'lucide-react'
-import { mockImoveis } from '@/lib/mock'
 import { Counter } from '@/components/site/Counter'
-import { useEffect, useState } from 'react'
+import { getImoveisDestaque } from '@/lib/supabase/queries/imoveis'
 
-export default function HomePage() {
-  const [destaques, setDestaques] = useState<any[]>([])
+export const revalidate = 60
 
-  useEffect(() => {
-    setDestaques(mockImoveis.filter(i => i.destaque && i.status === 'ativo').slice(0, 6))
-  }, [])
+export default async function HomePage() {
+  const destaques = await getImoveisDestaque()
 
   return (
     <div className="flex flex-col min-h-screen">
