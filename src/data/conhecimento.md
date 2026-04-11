@@ -56,9 +56,9 @@ A HOME Imob é uma imobiliária premium especializada no mercado imobiliário de
 ## Financiamento Imobiliário
 
 ### Principais Modalidades
-- **SBPE (Sistema Brasileiro de Poupança e Empréstimo):** Recursos da poupança, taxas a partir de 10,5% a.a. + TR
+- **SBPE (Sistema Brasileiro de Poupança e Empréstimo):** Recursos da poupança, taxas a partir de 10,5% a.a. + TR *(taxas sujeitas a variação — consulte seu banco para condições atuais)*
 - **FGTS:** Para quem tem saldo, pode ser usado como entrada ou amortização
-- **Poupança Casa Verde e Amarela:** Para imóveis até R$ 500 mil, taxas subsidiadas
+- **Minha Casa Minha Vida (MCMV):** Para imóveis até R$ 350 mil (faixa 1) a R$ 500 mil (faixa 2/3), taxas subsidiadas
 
 ### Como Funciona
 1. Simulação: cliente informa valor, entrada e prazo
@@ -72,7 +72,7 @@ A HOME Imob é uma imobiliária premium especializada no mercado imobiliário de
 - Quanto maior a entrada, menor a taxa de juros
 
 ### Custos Adicionais na Compra
-- ITBI (Imposto de Transmissão): 2% do valor venal (varia por município)
+- ITBI (Imposto de Transmissão): varia por município (ex: Florianópolis 2%, Balneário Camboriú 0,5%)
 - Escritura e registro: ~1,5% a 2%
 - Avaliação bancária: R$ 3.000 a R$ 5.000
 
