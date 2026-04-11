@@ -1,6 +1,6 @@
 import { ImovelCard } from '@/components/site/ImovelCard'
 import { FiltrosSidebar } from '@/components/site/FiltrosSidebar'
-import { mockImoveis } from '@/lib/mock'
+import { getImoveis } from '@/lib/supabase/queries/imoveis'
 import { Suspense } from 'react'
 import { Filter, Search } from 'lucide-react'
 
@@ -21,42 +21,16 @@ export default async function ImoveisPage({
   const vagas = params.vagas ? Number(params.vagas) : undefined
   const order = params.order as string
 
-  let imoveisFiltrados = mockImoveis.filter(i => i.status === 'ativo')
-
-  // Filtering Logic
-  if (finalidade) {
-    imoveisFiltrados = imoveisFiltrados.filter(i => i.finalidade === finalidade)
-  }
-  if (tipo) {
-    imoveisFiltrados = imoveisFiltrados.filter(i => i.tipo === tipo)
-  }
-  if (bairro) {
-    imoveisFiltrados = imoveisFiltrados.filter(i =>
-      i.bairro?.toLowerCase().includes(bairro.toLowerCase()) ||
-      i.cidade?.toLowerCase().includes(bairro.toLowerCase())
-    )
-  }
-  if (precoMin) {
-    imoveisFiltrados = imoveisFiltrados.filter(i => (i.preco || 0) >= precoMin)
-  }
-  if (precoMax) {
-    imoveisFiltrados = imoveisFiltrados.filter(i => (i.preco || 0) <= precoMax)
-  }
-  if (quartos) {
-    imoveisFiltrados = imoveisFiltrados.filter(i => (i.quartos || 0) >= quartos)
-  }
-  if (vagas) {
-    imoveisFiltrados = imoveisFiltrados.filter(i => (i.vagas || 0) >= vagas)
-  }
-
-  // Sorting
-  if (order === 'price_desc') {
-    imoveisFiltrados.sort((a, b) => (b.preco || 0) - (a.preco || 0))
-  } else if (order === 'price_asc') {
-    imoveisFiltrados.sort((a, b) => (a.preco || 0) - (b.preco || 0))
-  } else {
-    imoveisFiltrados = [...imoveisFiltrados].reverse()
-  }
+  const imoveisFiltrados = await getImoveis({
+    finalidade: finalidade || undefined,
+    tipo: tipo || undefined,
+    bairro: bairro || undefined,
+    precoMin,
+    precoMax,
+    quartos,
+    vagas,
+    order: order || undefined,
+  })
 
   return (
     <div className="bg-background min-h-screen">

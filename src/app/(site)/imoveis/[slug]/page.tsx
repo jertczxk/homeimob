@@ -1,25 +1,16 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
 import { ImovelGaleria } from '@/components/site/ImovelGaleria'
 import { FormContato } from '@/components/site/FormContato'
 import { Badge } from '@/components/ui/badge'
-import { BedDouble, Bath, Car, Maximize, MapPin, CheckCircle2 } from 'lucide-react'
-import { ImovelComFotos } from '@/types'
+import { BedDouble, Bath, Car, Maximize, MapPin } from 'lucide-react'
+import { getImovelBySlug } from '@/lib/supabase/queries/imoveis'
 
-export const revalidate = 60 // Revalidate every minute
-
-import { mockImoveis } from '@/lib/mock'
-
-async function getImovel(slug: string) {
-  const imovel = mockImoveis.find(i => i.slug === slug)
-  if (!imovel) return null
-  return imovel
-}
+export const revalidate = 60
 
 export default async function ImovelDetalhePage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params
-  const imovel = await getImovel(resolvedParams.slug)
+  const imovel = await getImovelBySlug(resolvedParams.slug)
 
   if (!imovel) notFound()
 
