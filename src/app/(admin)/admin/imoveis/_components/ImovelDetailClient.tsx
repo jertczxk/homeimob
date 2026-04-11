@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { ImovelComFotos, StatusImovel, FinalidadeImovel } from '@/types'
 import { deleteImovel } from '../actions'
+import { UploadFotos } from '@/components/admin/UploadFotos'
 
 const statusConfig: Record<StatusImovel, { label: string; color: string }> = {
   ativo: { label: 'Ativo', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' },
@@ -180,19 +181,7 @@ export function ImovelDetailClient({ imovel }: { imovel: ImovelComFotos }) {
       )}
 
       {activeTab === 'fotos' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {imovel.imovel_fotos.map((foto, i) => (
-            <div key={foto.id} className="aspect-square rounded-xl overflow-hidden relative group border border-white/5">
-              <Image src={foto.url} alt={`Foto ${i + 1}`} fill className="object-cover" />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                <span className="text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">#{i + 1}</span>
-              </div>
-            </div>
-          ))}
-          {imovel.imovel_fotos.length === 0 && (
-            <p className="col-span-4 text-center text-zinc-500 text-sm py-8">Nenhuma foto cadastrada.</p>
-          )}
-        </div>
+        <UploadFotos imovelId={imovel.id} fotos={imovel.imovel_fotos} />
       )}
 
       {activeTab === 'historico' && (

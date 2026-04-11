@@ -78,3 +78,19 @@ export async function deleteImovel(id: string) {
   revalidatePath('/imoveis')
   redirect('/admin/imoveis')
 }
+
+export async function addFotoImovel(imovelId: string, url: string, ordem: number) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('imovel_fotos').insert({ imovel_id: imovelId, url, ordem })
+  if (error) throw new Error(error.message)
+  revalidatePath(`/admin/imoveis/${imovelId}`)
+  revalidatePath(`/imoveis`)
+}
+
+export async function deleteFotoImovel(fotoId: string, imovelId: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('imovel_fotos').delete().eq('id', fotoId)
+  if (error) throw new Error(error.message)
+  revalidatePath(`/admin/imoveis/${imovelId}`)
+  revalidatePath(`/imoveis`)
+}
