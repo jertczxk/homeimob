@@ -1,36 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Upload, X, GripVertical, MapPin, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TipoImovel, FinalidadeImovel, StatusImovel } from '@/types'
-
-interface ImovelFormData {
-  titulo: string
-  descricao: string
-  tipo: TipoImovel
-  finalidade: FinalidadeImovel
-  preco: string
-  area_m2: string
-  quartos: string
-  banheiros: string
-  vagas: string
-  endereco: string
-  bairro: string
-  cidade: string
-  uf: string
-  cep: string
-  status: StatusImovel
-  destaque: boolean
-}
-
-const initialForm: ImovelFormData = {
-  titulo: '', descricao: '', tipo: 'residencial', finalidade: 'venda',
-  preco: '', area_m2: '', quartos: '', banheiros: '', vagas: '',
-  endereco: '', bairro: '', cidade: '', uf: '', cep: '',
-  status: 'ativo', destaque: false,
-}
+import { createImovel } from '../actions'
 
 function FormField({ label, children, span }: { label: string; children: React.ReactNode; span?: number }) {
   return (
@@ -45,24 +20,19 @@ const inputClass = "w-full bg-zinc-800/50 border border-white/5 rounded-lg px-3 
 const selectClass = "w-full bg-zinc-800/50 border border-white/5 rounded-lg px-3 py-2.5 text-sm text-zinc-300 outline-none focus:border-accent/30 transition-colors cursor-pointer"
 
 export default function NovoImovelPage() {
-  const [form, setForm] = useState<ImovelFormData>(initialForm)
   const [photos, setPhotos] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
+  const [destaque, setDestaque] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
-  const update = (field: keyof ImovelFormData, value: string | boolean) => {
-    setForm(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    // Simular save
-    await new Promise(r => setTimeout(r, 1000))
-    setSaving(false)
-    alert('Imóvel salvo com sucesso! (mock)')
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    formData.set('destaque', String(destaque))
+    startTransition(() => createImovel(formData))
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -75,12 +45,12 @@ export default function NovoImovelPage() {
           </div>
         </div>
         <button
-          onClick={handleSave}
-          disabled={saving}
+          type="submit"
+          disabled={isPending}
           className="flex items-center gap-2 bg-accent text-accent-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {saving ? 'Salvando...' : 'Salvar'}
+          {isPending ? 'Salvando...' : 'Salvar'}
         </button>
       </div>
 
@@ -89,40 +59,40 @@ export default function NovoImovelPage() {
         <h3 className="text-sm font-semibold text-white">Dados do Imóvel</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Título" span={2}>
-            <input className={inputClass} placeholder="Ex: Casa com piscina nos Jardins" value={form.titulo} onChange={e => update('titulo', e.target.value)} />
+            <input name="titulo" required className={inputClass} placeholder="Ex: Casa com piscina nos Jardins" />
           </FormField>
           <FormField label="Descrição" span={2}>
-            <textarea className={cn(inputClass, 'min-h-[100px] resize-y')} placeholder="Descreva o imóvel..." value={form.descricao} onChange={e => update('descricao', e.target.value)} />
+            <textarea name="descricao" className={cn(inputClass, 'min-h-[100px] resize-y')} placeholder="Descreva o imóvel..." />
           </FormField>
           <FormField label="Tipo">
-            <select className={selectClass} value={form.tipo} onChange={e => update('tipo', e.target.value)}>
+            <select name="tipo" className={selectClass} defaultValue="residencial">
               <option value="residencial">Residencial</option>
               <option value="comercial">Comercial</option>
             </select>
           </FormField>
           <FormField label="Finalidade">
-            <select className={selectClass} value={form.finalidade} onChange={e => update('finalidade', e.target.value)}>
+            <select name="finalidade" className={selectClass} defaultValue="venda">
               <option value="venda">Venda</option>
               <option value="locação">Locação</option>
             </select>
           </FormField>
           <FormField label="Preço (R$)">
-            <input type="number" className={inputClass} placeholder="0,00" value={form.preco} onChange={e => update('preco', e.target.value)} />
+            <input name="preco" type="number" className={inputClass} placeholder="0,00" />
           </FormField>
           <FormField label="Área (m²)">
-            <input type="number" className={inputClass} placeholder="0" value={form.area_m2} onChange={e => update('area_m2', e.target.value)} />
+            <input name="area_m2" type="number" className={inputClass} placeholder="0" />
           </FormField>
           <FormField label="Quartos">
-            <input type="number" className={inputClass} placeholder="0" value={form.quartos} onChange={e => update('quartos', e.target.value)} />
+            <input name="quartos" type="number" className={inputClass} placeholder="0" defaultValue="0" />
           </FormField>
           <FormField label="Banheiros">
-            <input type="number" className={inputClass} placeholder="0" value={form.banheiros} onChange={e => update('banheiros', e.target.value)} />
+            <input name="banheiros" type="number" className={inputClass} placeholder="0" defaultValue="0" />
           </FormField>
           <FormField label="Vagas">
-            <input type="number" className={inputClass} placeholder="0" value={form.vagas} onChange={e => update('vagas', e.target.value)} />
+            <input name="vagas" type="number" className={inputClass} placeholder="0" defaultValue="0" />
           </FormField>
           <FormField label="Status">
-            <select className={selectClass} value={form.status} onChange={e => update('status', e.target.value)}>
+            <select name="status" className={selectClass} defaultValue="ativo">
               <option value="ativo">Ativo</option>
               <option value="inativo">Inativo</option>
               <option value="vendido">Vendido</option>
@@ -131,7 +101,12 @@ export default function NovoImovelPage() {
           </FormField>
         </div>
         <label className="flex items-center gap-2.5 cursor-pointer select-none">
-          <input type="checkbox" checked={form.destaque} onChange={e => update('destaque', e.target.checked)} className="w-4 h-4 rounded border-white/10 bg-zinc-800 accent-accent" />
+          <input
+            type="checkbox"
+            checked={destaque}
+            onChange={e => setDestaque(e.target.checked)}
+            className="w-4 h-4 rounded border-white/10 bg-zinc-800 accent-accent"
+          />
           <span className="text-sm text-zinc-300">Marcar como destaque</span>
         </label>
       </section>
@@ -144,6 +119,7 @@ export default function NovoImovelPage() {
             <div key={i} className="aspect-square relative rounded-xl overflow-hidden border border-white/5 group">
               <img src={url} alt="" className="w-full h-full object-cover" />
               <button
+                type="button"
                 onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
                 className="absolute top-2 right-2 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
               >
@@ -155,8 +131,8 @@ export default function NovoImovelPage() {
             </div>
           ))}
           <button
+            type="button"
             onClick={() => {
-              // Mock: adicionar uma foto de exemplo
               setPhotos([...photos, `https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400&h=400&fit=crop&q=80&sig=${Date.now()}`])
             }}
             className="aspect-square rounded-xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:border-accent/30 hover:text-accent transition-colors"
@@ -176,22 +152,21 @@ export default function NovoImovelPage() {
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Endereço" span={2}>
-            <input className={inputClass} placeholder="Rua, número" value={form.endereco} onChange={e => update('endereco', e.target.value)} />
+            <input name="endereco" className={inputClass} placeholder="Rua, número" />
           </FormField>
           <FormField label="Bairro">
-            <input className={inputClass} placeholder="Bairro" value={form.bairro} onChange={e => update('bairro', e.target.value)} />
+            <input name="bairro" className={inputClass} placeholder="Bairro" />
           </FormField>
           <FormField label="Cidade">
-            <input className={inputClass} placeholder="Cidade" value={form.cidade} onChange={e => update('cidade', e.target.value)} />
+            <input name="cidade" className={inputClass} placeholder="Cidade" />
           </FormField>
           <FormField label="UF">
-            <input className={inputClass} placeholder="SP" maxLength={2} value={form.uf} onChange={e => update('uf', e.target.value)} />
+            <input name="uf" className={inputClass} placeholder="SP" maxLength={2} />
           </FormField>
           <FormField label="CEP">
-            <input className={inputClass} placeholder="00000-000" value={form.cep} onChange={e => update('cep', e.target.value)} />
+            <input name="cep" className={inputClass} placeholder="00000-000" />
           </FormField>
         </div>
-        {/* Map Placeholder */}
         <div className="w-full h-48 bg-zinc-800/50 rounded-xl border border-white/5 flex items-center justify-center">
           <div className="text-center text-zinc-600">
             <MapPin className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -200,6 +175,6 @@ export default function NovoImovelPage() {
           </div>
         </div>
       </section>
-    </div>
+    </form>
   )
 }
