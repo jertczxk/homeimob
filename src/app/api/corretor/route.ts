@@ -10,7 +10,7 @@ const client = new OpenAI({
   },
 })
 
-const MODEL = 'google/gemini-2.5-flash-lite-preview'
+const MODEL = 'google/gemini-2.5-flash-lite'
 
 const SYSTEM_PROMPT = `Você é o Corretor Virtual da HOME Imob, uma imobiliária premium em Santa Catarina.
 Seja cordial, profissional e objetivo. Responda sempre em português.
