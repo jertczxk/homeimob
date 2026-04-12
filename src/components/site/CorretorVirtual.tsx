@@ -1,10 +1,31 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { SendHorizontal, Bot, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { SendHorizontal, Bot, BedDouble, Ruler, MapPin, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type ChatMessage = { role: 'user' | 'assistant'; content: string }
+type ImovelCard = {
+  titulo: string
+  tipo: string
+  finalidade: string
+  preco: string
+  quartos: number
+  banheiros: number
+  vagas: number
+  area_m2: number | null
+  bairro: string | null
+  cidade: string | null
+  link: string
+  foto: string | null
+}
+
+type ChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  imoveis?: ImovelCard[]
+}
 
 const suggestions = [
   'Opções para investimentos em Florianópolis',
@@ -13,14 +34,85 @@ const suggestions = [
   'Quero simular um financiamento',
 ]
 
+function TypingDots() {
+  return (
+    <span className="flex items-center gap-1 py-1 px-1">
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"
+          style={{ animationDelay: `${delay}ms` }}
+        />
+      ))}
+    </span>
+  )
+}
+
+function PropertyCard({ imovel }: { imovel: ImovelCard }) {
+  return (
+    <Link
+      href={imovel.link}
+      target="_blank"
+      className="shrink-0 w-48 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-white/10 rounded-2xl overflow-hidden hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300 group/card"
+    >
+      {/* Photo */}
+      <div className="relative h-28 bg-zinc-100 dark:bg-zinc-700 overflow-hidden">
+        {imovel.foto ? (
+          <Image
+            src={imovel.foto}
+            alt={imovel.titulo}
+            fill
+            className="object-cover group-hover/card:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Home className="h-7 w-7 text-zinc-300 dark:text-zinc-600" />
+          </div>
+        )}
+        <span className="absolute top-2 left-2 text-[9px] font-bold bg-black/55 text-white px-2 py-0.5 rounded-full backdrop-blur-sm capitalize">
+          {imovel.finalidade}
+        </span>
+      </div>
+
+      {/* Info */}
+      <div className="p-3 space-y-1.5">
+        <p className="text-xs font-bold text-accent leading-tight">{imovel.preco}</p>
+        <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-100 leading-snug line-clamp-2">
+          {imovel.titulo}
+        </p>
+        <div className="flex items-center gap-2.5 text-[10px] text-zinc-500">
+          {imovel.quartos > 0 && (
+            <span className="flex items-center gap-0.5">
+              <BedDouble className="h-3 w-3" />{imovel.quartos}q
+            </span>
+          )}
+          {imovel.area_m2 && (
+            <span className="flex items-center gap-0.5">
+              <Ruler className="h-3 w-3" />{imovel.area_m2}m²
+            </span>
+          )}
+        </div>
+        {(imovel.bairro || imovel.cidade) && (
+          <p className="text-[10px] text-zinc-400 flex items-center gap-1 truncate">
+            <MapPin className="h-3 w-3 shrink-0" />
+            {[imovel.bairro, imovel.cidade].filter(Boolean).join(', ')}
+          </p>
+        )}
+      </div>
+    </Link>
+  )
+}
+
 export function CorretorVirtual() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
 
+  // Scroll the chat container — NOT the page
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = chatContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [messages])
 
   async function sendMessage(text: string) {
@@ -40,9 +132,11 @@ export function CorretorVirtual() {
 
       if (!response.ok) throw new Error(`Erro ${response.status}`)
       if (!response.body) throw new Error('No response body')
+
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let assistantContent = ''
+      let imoveisData: ImovelCard[] | undefined
 
       let buffer = ''
       let done = false
@@ -51,26 +145,38 @@ export function CorretorVirtual() {
         done = result.done
         if (result.value) buffer += decoder.decode(result.value, { stream: true })
         const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''  // keep the potentially incomplete last line
+        buffer = lines.pop() ?? ''
         let stop = false
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6)
           if (data === '[DONE]') { stop = true; break }
           try {
-            const parsed = JSON.parse(data)
-            if (typeof parsed === 'string') {
-              assistantContent += parsed
-            } else if (parsed?.error) {
-              assistantContent = `Desculpe, ocorreu um erro: ${parsed.error}`
+            const parsed = JSON.parse(data) as {
+              type?: string
+              chunk?: string
+              data?: ImovelCard[]
+              message?: string
+              error?: string
+            }
+            if (parsed.type === 'text' && parsed.chunk) {
+              assistantContent += parsed.chunk
+            } else if (parsed.type === 'imoveis' && parsed.data) {
+              imoveisData = parsed.data
+            } else if (parsed.type === 'error' || parsed.error) {
+              assistantContent = parsed.message ?? parsed.error ?? 'Ocorreu um erro.'
             }
             setMessages(prev => {
               const updated = [...prev]
-              updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+              updated[updated.length - 1] = {
+                role: 'assistant',
+                content: assistantContent,
+                imoveis: imoveisData,
+              }
               return updated
             })
           } catch {
-            // ignore parse errors
+            // ignore parse errors on partial chunks
           }
         }
         if (stop) break
@@ -131,10 +237,13 @@ export function CorretorVirtual() {
                 </span>
               </div>
 
-              {/* Chat Area */}
-              <div className="p-6 md:p-8 min-h-[350px] max-h-[500px] overflow-y-auto flex flex-col gap-4">
+              {/* Chat Area — scroll is contained here, NOT the page */}
+              <div
+                ref={chatContainerRef}
+                className="p-6 md:p-8 min-h-[350px] max-h-[520px] overflow-y-auto flex flex-col gap-4 scroll-smooth"
+              >
                 {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full space-y-8 text-center py-8">
+                  <div className="flex flex-col items-center justify-center flex-1 space-y-8 text-center py-8">
                     <div className="space-y-4">
                       <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto">
                         <Bot className="h-8 w-8 text-accent shrink-0" />
@@ -160,39 +269,41 @@ export function CorretorVirtual() {
                     </div>
                   </div>
                 ) : (
-                  <>
-                    {messages.map((msg, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          'flex gap-3',
-                          msg.role === 'user' ? 'justify-end' : 'justify-start'
-                        )}
-                      >
-                        {msg.role === 'assistant' && (
-                          <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 mt-1">
-                            <Bot className="h-4 w-4 text-accent" />
-                          </div>
-                        )}
+                  messages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={cn('flex gap-3', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+                    >
+                      {msg.role === 'assistant' && (
+                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 mt-1">
+                          <Bot className="h-4 w-4 text-accent" />
+                        </div>
+                      )}
+
+                      <div className={cn('flex flex-col gap-3', msg.role === 'user' ? 'items-end max-w-[80%]' : 'items-start max-w-[85%]')}>
+                        {/* Bubble */}
                         <div
                           className={cn(
-                            'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+                            'rounded-2xl px-4 py-3 text-sm leading-relaxed',
                             msg.role === 'user'
                               ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-br-sm'
-                              : 'bg-zinc-100 dark:bg-white/5 text-zinc-800 dark:text-zinc-200 rounded-bl-sm border border-zinc-200 dark:border-white/10'
+                              : 'bg-zinc-100 dark:bg-white/5 text-zinc-800 dark:text-zinc-200 rounded-bl-sm border border-zinc-200 dark:border-white/10 whitespace-pre-line'
                           )}
                         >
-                          {msg.content || (
-                            <span className="flex items-center gap-2 text-zinc-400">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Pensando...
-                            </span>
-                          )}
+                          {msg.content || <TypingDots />}
                         </div>
+
+                        {/* Property cards — horizontal scroll row */}
+                        {msg.imoveis && msg.imoveis.length > 0 && (
+                          <div className="flex gap-3 overflow-x-auto pb-1 w-full max-w-[500px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {msg.imoveis.map((im, idx) => (
+                              <PropertyCard key={idx} imovel={im} />
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </>
+                    </div>
+                  ))
                 )}
               </div>
 
@@ -214,11 +325,7 @@ export function CorretorVirtual() {
                     disabled={isLoading || !input.trim()}
                     className="absolute right-2 top-2 h-10 w-10 flex items-center justify-center bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                   >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <SendHorizontal className="h-4 w-4" />
-                    )}
+                    <SendHorizontal className="h-4 w-4" />
                   </button>
                 </div>
               </div>

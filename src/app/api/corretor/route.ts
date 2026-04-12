@@ -14,9 +14,21 @@ const MODEL = 'google/gemini-2.5-flash-lite'
 
 const SYSTEM_PROMPT = `Você é o Corretor Virtual da HOME Imob, uma imobiliária premium em Santa Catarina.
 Seja cordial, profissional e objetivo. Responda sempre em português.
+Nunca use formatação markdown como asteriscos (**texto**), hashtags (#), underlines ou outros símbolos de formatação. Use apenas texto simples.
 Use as ferramentas disponíveis para buscar imóveis, responder dúvidas sobre a imobiliária e registrar simulações de financiamento.
-Quando apresentar imóveis, inclua detalhes relevantes e o link /imoveis/[slug] para cada um.
+Quando apresentar imóveis, mencione brevemente os destaques — os cards visuais já serão exibidos automaticamente para o usuário.
 Nunca invente informações — use apenas o que as ferramentas retornam.`
+
+// Split text into sentences for natural streaming cadence
+function splitBySentences(text: string): string[] {
+  const parts = text.split(/(?<=[.!?])\s+/)
+  return parts.filter(p => p.trim().length > 0)
+}
+
+// SSE event helpers
+function sseChunk(encoder: TextEncoder, payload: unknown): Uint8Array {
+  return encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
+}
 
 const tools: OpenAI.Chat.ChatCompletionTool[] = [
   {
@@ -88,11 +100,18 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
   return JSON.stringify({ erro: `Ferramenta desconhecida: ${name}` })
 }
 
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  Connection: 'keep-alive',
+}
+
 export async function POST(request: Request) {
   const sseError = (msg: string) =>
-    new Response(`data: ${JSON.stringify({ error: msg })}\n\ndata: [DONE]\n\n`, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-    })
+    new Response(
+      `data: ${JSON.stringify({ type: 'error', message: msg })}\n\ndata: [DONE]\n\n`,
+      { headers: SSE_HEADERS }
+    )
 
   let messages: OpenAI.Chat.ChatCompletionMessageParam[]
   try {
@@ -109,8 +128,10 @@ export async function POST(request: Request) {
   ]
 
   try {
-    // Agent loop: run until no more tool calls (max 5 iterations to prevent infinite loops)
     let iterations = 0
+    // Capture imoveis results across tool iterations to send as structured data
+    let lastImoveis: Record<string, unknown>[] | undefined
+
     while (iterations < 5) {
       iterations++
       const response = await client.chat.completions.create({
@@ -124,47 +145,63 @@ export async function POST(request: Request) {
       const message = response.choices[0].message
 
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        // No tool calls — stream the final text response as SSE
         const finalContent = message.content ?? ''
+        const sentences = splitBySentences(finalContent)
 
         const stream = new ReadableStream({
           start(controller) {
             const encoder = new TextEncoder()
-            const words = finalContent.split(' ')
-            let i = 0
 
+            // Send imoveis cards data first (if any) so frontend renders cards before text
+            if (lastImoveis && lastImoveis.length > 0) {
+              controller.enqueue(sseChunk(encoder, { type: 'imoveis', data: lastImoveis }))
+            }
+
+            // Stream text sentence by sentence
+            let i = 0
             function pushNext() {
-              if (i >= words.length) {
+              if (i >= sentences.length) {
                 controller.enqueue(encoder.encode('data: [DONE]\n\n'))
                 controller.close()
                 return
               }
-              const chunk = (i === 0 ? '' : ' ') + words[i]
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
+              const chunk = sentences[i] + (i < sentences.length - 1 ? ' ' : '')
+              controller.enqueue(sseChunk(encoder, { type: 'text', chunk }))
               i++
-              setTimeout(pushNext, 12)
+              setTimeout(pushNext, 40)
+            }
+
+            // If no sentences (empty response), just close
+            if (sentences.length === 0) {
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+              controller.close()
+              return
             }
 
             pushNext()
           },
         })
 
-        return new Response(stream, {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-          },
-        })
+        return new Response(stream, { headers: SSE_HEADERS })
       }
 
-      // Has tool calls — execute them and add results
+      // Execute tool calls and capture imoveis results
       conversationMessages.push(message)
 
       for (const toolCall of message.tool_calls) {
         if (toolCall.type !== 'function') continue
         const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
         const result = await executeTool(toolCall.function.name, args)
+
+        if (toolCall.function.name === 'buscar_imoveis') {
+          try {
+            const parsed = JSON.parse(result) as { imoveis?: Record<string, unknown>[] }
+            if (parsed.imoveis && parsed.imoveis.length > 0) {
+              lastImoveis = parsed.imoveis
+            }
+          } catch { /* ignore */ }
+        }
+
         conversationMessages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -173,18 +210,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Stream a fallback message if loop limit is hit
+    // Loop limit fallback
+    const encoder = new TextEncoder()
     const fallbackStream = new ReadableStream({
       start(controller) {
-        const encoder = new TextEncoder()
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify('Desculpe, não consegui processar sua solicitação. Tente novamente.')}\n\n`))
+        controller.enqueue(sseChunk(encoder, { type: 'text', chunk: 'Desculpe, não consegui processar sua solicitação. Tente novamente.' }))
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
       },
     })
-    return new Response(fallbackStream, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
-    })
+    return new Response(fallbackStream, { headers: SSE_HEADERS })
+
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro interno.'
     return sseError(`Ocorreu um erro: ${msg}`)
