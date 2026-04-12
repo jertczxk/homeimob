@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { SendHorizontal, Bot, BedDouble, Ruler, MapPin, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PropertyPlaceholder } from '@/components/ui/PropertyPlaceholder'
 
 type ImovelCard = {
   titulo: string
@@ -65,9 +66,7 @@ function PropertyCard({ imovel }: { imovel: ImovelCard }) {
             className="object-cover group-hover/card:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Home className="h-7 w-7 text-zinc-300 dark:text-zinc-600" />
-          </div>
+          <PropertyPlaceholder />
         )}
         <span className="absolute top-2 left-2 text-[9px] font-bold bg-black/55 text-white px-2 py-0.5 rounded-full backdrop-blur-sm capitalize">
           {imovel.finalidade}
@@ -181,6 +180,20 @@ export function CorretorVirtual() {
         }
         if (stop) break
       }
+
+      // Ensure the assistant message always has content (never stuck on typing dots)
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant' && !last.content) {
+          const updated = [...prev]
+          updated[updated.length - 1] = {
+            ...last,
+            content: last.imoveis?.length ? 'Aqui estão algumas opções que encontrei para você:' : 'Desculpe, não consegui processar sua solicitação. Tente novamente.',
+          }
+          return updated
+        }
+        return prev
+      })
     } catch {
       setMessages(prev => {
         const updated = [...prev]
@@ -232,9 +245,6 @@ export function CorretorVirtual() {
                     Assistente Ativo
                   </span>
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-white/60 opacity-60">
-                  Resposta em Streaming
-                </span>
               </div>
 
               {/* Chat Area — scroll is contained here, NOT the page */}

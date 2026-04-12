@@ -10,13 +10,14 @@ const client = new OpenAI({
   },
 })
 
-const MODEL = 'google/gemini-2.5-flash-lite'
+const MODEL = 'openai/gpt-4o-mini'
 
 const SYSTEM_PROMPT = `Você é o Corretor Virtual da HOME Imob, uma imobiliária premium em Santa Catarina.
 Seja cordial, profissional e objetivo. Responda sempre em português.
-Nunca use formatação markdown como asteriscos (**texto**), hashtags (#), underlines ou outros símbolos de formatação. Use apenas texto simples.
-Use as ferramentas disponíveis para buscar imóveis, responder dúvidas sobre a imobiliária e registrar simulações de financiamento.
-Quando apresentar imóveis, mencione brevemente os destaques — os cards visuais já serão exibidos automaticamente para o usuário.
+REGRAS DE FORMATAÇÃO: Nunca use markdown — sem asteriscos, hashtags, underlines, bullets (*), hífens como lista, ou qualquer símbolo especial. Use apenas texto corrido, separando ideias com ponto e vírgula ou vírgulas. Sem quebras de linha duplas (\n\n).
+REGRAS DE BUSCA: Sempre que o usuário mencionar imóveis, quartos, preço, cidade, investimentos, lançamentos ou aluguel, chame imediatamente buscar_imoveis com os filtros disponíveis — sem pedir mais informações primeiro. Se a cidade não for especificada, busque sem filtro de cidade (abrange toda Santa Catarina). Só peça mais detalhes APÓS mostrar os resultados se o usuário quiser refinar a busca.
+Quando apresentar imóveis, mencione brevemente os destaques em texto corrido — os cards visuais já serão exibidos automaticamente.
+Use as ferramentas disponíveis para responder dúvidas sobre a imobiliária e registrar simulações de financiamento.
 Nunca invente informações — use apenas o que as ferramentas retornam.`
 
 // Split text into sentences for natural streaming cadence
@@ -84,7 +85,9 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
   },
 ]
 
-async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+async function executeTool(rawName: string, args: Record<string, unknown>): Promise<string> {
+  // Gemini sometimes prefixes tool names with "default_api." — strip it
+  const name = rawName.replace(/^default_api\./, '')
   if (name === 'buscar_imoveis') {
     const result = await executeBuscarImoveis(args as unknown as Parameters<typeof executeBuscarImoveis>[0])
     return JSON.stringify(result)
@@ -112,9 +115,12 @@ async function runAgent(
   controller: ReadableStreamDefaultController<Uint8Array>,
 ) {
   let iterations = 0
+  console.log('[corretor] runAgent started, messages:', conversationMessages.length)
 
   while (iterations < 5) {
     iterations++
+    console.log(`[corretor] iteration ${iterations} — calling LLM`)
+
     const response = await client.chat.completions.create({
       model: MODEL,
       messages: conversationMessages,
@@ -124,12 +130,20 @@ async function runAgent(
     })
 
     const message = response.choices[0].message
+    console.log(`[corretor] iteration ${iterations} — finish_reason:`, response.choices[0].finish_reason, '| tool_calls:', message.tool_calls?.length ?? 0, '| content length:', message.content?.length ?? 0)
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
       const finalContent = message.content ?? ''
       const sentences = splitBySentences(finalContent)
+      console.log(`[corretor] final response — sentences:`, sentences.length, '| content:', finalContent.slice(0, 100))
 
       if (sentences.length === 0) {
+        // Model returned empty — retry silently (gemini-flash-lite is occasionally unreliable)
+        if (iterations < 3) {
+          console.log(`[corretor] empty response on iteration ${iterations} — retrying`)
+          continue
+        }
+        controller.enqueue(sseChunk(encoder, { type: 'text', chunk: 'Posso ajudá-lo a encontrar o imóvel ideal ou responder suas dúvidas. Como posso auxiliá-lo?' }))
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
         return
@@ -154,16 +168,22 @@ async function runAgent(
     for (const toolCall of message.tool_calls) {
       if (toolCall.type !== 'function') continue
       const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
+      console.log(`[corretor] executing tool: ${toolCall.function.name}`, args)
       const result = await executeTool(toolCall.function.name, args)
+      console.log(`[corretor] tool result length: ${result.length} chars | preview:`, result.slice(0, 120))
 
       // Send imoveis immediately when found — don't wait for the final text response
       if (toolCall.function.name === 'buscar_imoveis') {
         try {
           const parsed = JSON.parse(result) as { imoveis?: Record<string, unknown>[] }
+          console.log(`[corretor] buscar_imoveis found:`, parsed.imoveis?.length ?? 0, 'properties')
           if (parsed.imoveis && parsed.imoveis.length > 0) {
             controller.enqueue(sseChunk(encoder, { type: 'imoveis', data: parsed.imoveis }))
+            console.log('[corretor] imoveis event sent to client')
           }
-        } catch { /* ignore */ }
+        } catch (e) {
+          console.error('[corretor] failed to parse buscar_imoveis result:', e)
+        }
       }
 
       conversationMessages.push({
@@ -175,6 +195,7 @@ async function runAgent(
   }
 
   // Loop limit fallback
+  console.log('[corretor] hit iteration limit — sending fallback')
   controller.enqueue(sseChunk(encoder, { type: 'text', chunk: 'Desculpe, não consegui processar sua solicitação. Tente novamente.' }))
   controller.enqueue(encoder.encode('data: [DONE]\n\n'))
   controller.close()

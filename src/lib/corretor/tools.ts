@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient as createDirectClient } from '@supabase/supabase-js'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -30,7 +29,10 @@ interface ImovelQueryRow {
 }
 
 export async function executeBuscarImoveis(params: BuscarImoveisParams) {
-  const supabase = await createClient()
+  const supabase = createDirectClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   let query = supabase
     .from('imoveis')
@@ -102,7 +104,7 @@ export interface RegistrarSimulacaoParams {
 }
 
 export async function executeRegistrarSimulacao(params: RegistrarSimulacaoParams) {
-  const supabase = createServiceClient(
+  const supabase = createDirectClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
