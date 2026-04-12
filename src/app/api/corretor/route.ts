@@ -106,6 +106,80 @@ const SSE_HEADERS = {
   Connection: 'keep-alive',
 }
 
+async function runAgent(
+  conversationMessages: OpenAI.Chat.ChatCompletionMessageParam[],
+  encoder: TextEncoder,
+  controller: ReadableStreamDefaultController<Uint8Array>,
+) {
+  let iterations = 0
+
+  while (iterations < 5) {
+    iterations++
+    const response = await client.chat.completions.create({
+      model: MODEL,
+      messages: conversationMessages,
+      tools,
+      tool_choice: 'auto',
+      stream: false,
+    })
+
+    const message = response.choices[0].message
+
+    if (!message.tool_calls || message.tool_calls.length === 0) {
+      const finalContent = message.content ?? ''
+      const sentences = splitBySentences(finalContent)
+
+      if (sentences.length === 0) {
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+        return
+      }
+
+      for (let i = 0; i < sentences.length; i++) {
+        const chunk = sentences[i] + (i < sentences.length - 1 ? ' ' : '')
+        controller.enqueue(sseChunk(encoder, { type: 'text', chunk }))
+        if (i < sentences.length - 1) {
+          await new Promise<void>(resolve => setTimeout(resolve, 40))
+        }
+      }
+
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+      controller.close()
+      return
+    }
+
+    // Execute tool calls
+    conversationMessages.push(message)
+
+    for (const toolCall of message.tool_calls) {
+      if (toolCall.type !== 'function') continue
+      const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
+      const result = await executeTool(toolCall.function.name, args)
+
+      // Send imoveis immediately when found — don't wait for the final text response
+      if (toolCall.function.name === 'buscar_imoveis') {
+        try {
+          const parsed = JSON.parse(result) as { imoveis?: Record<string, unknown>[] }
+          if (parsed.imoveis && parsed.imoveis.length > 0) {
+            controller.enqueue(sseChunk(encoder, { type: 'imoveis', data: parsed.imoveis }))
+          }
+        } catch { /* ignore */ }
+      }
+
+      conversationMessages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: result,
+      })
+    }
+  }
+
+  // Loop limit fallback
+  controller.enqueue(sseChunk(encoder, { type: 'text', chunk: 'Desculpe, não consegui processar sua solicitação. Tente novamente.' }))
+  controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+  controller.close()
+}
+
 export async function POST(request: Request) {
   const sseError = (msg: string) =>
     new Response(
@@ -127,102 +201,20 @@ export async function POST(request: Request) {
     ...messages,
   ]
 
-  try {
-    let iterations = 0
-    // Capture imoveis results across tool iterations to send as structured data
-    let lastImoveis: Record<string, unknown>[] | undefined
+  const encoder = new TextEncoder()
 
-    while (iterations < 5) {
-      iterations++
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        messages: conversationMessages,
-        tools,
-        tool_choice: 'auto',
-        stream: false,
-      })
-
-      const message = response.choices[0].message
-
-      if (!message.tool_calls || message.tool_calls.length === 0) {
-        const finalContent = message.content ?? ''
-        const sentences = splitBySentences(finalContent)
-
-        const stream = new ReadableStream({
-          start(controller) {
-            const encoder = new TextEncoder()
-
-            // Send imoveis cards data first (if any) so frontend renders cards before text
-            if (lastImoveis && lastImoveis.length > 0) {
-              controller.enqueue(sseChunk(encoder, { type: 'imoveis', data: lastImoveis }))
-            }
-
-            // Stream text sentence by sentence
-            let i = 0
-            function pushNext() {
-              if (i >= sentences.length) {
-                controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-                controller.close()
-                return
-              }
-              const chunk = sentences[i] + (i < sentences.length - 1 ? ' ' : '')
-              controller.enqueue(sseChunk(encoder, { type: 'text', chunk }))
-              i++
-              setTimeout(pushNext, 40)
-            }
-
-            // If no sentences (empty response), just close
-            if (sentences.length === 0) {
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-              controller.close()
-              return
-            }
-
-            pushNext()
-          },
-        })
-
-        return new Response(stream, { headers: SSE_HEADERS })
-      }
-
-      // Execute tool calls and capture imoveis results
-      conversationMessages.push(message)
-
-      for (const toolCall of message.tool_calls) {
-        if (toolCall.type !== 'function') continue
-        const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
-        const result = await executeTool(toolCall.function.name, args)
-
-        if (toolCall.function.name === 'buscar_imoveis') {
-          try {
-            const parsed = JSON.parse(result) as { imoveis?: Record<string, unknown>[] }
-            if (parsed.imoveis && parsed.imoveis.length > 0) {
-              lastImoveis = parsed.imoveis
-            }
-          } catch { /* ignore */ }
-        }
-
-        conversationMessages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: result,
-        })
-      }
-    }
-
-    // Loop limit fallback
-    const encoder = new TextEncoder()
-    const fallbackStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(sseChunk(encoder, { type: 'text', chunk: 'Desculpe, não consegui processar sua solicitação. Tente novamente.' }))
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      // Start the agent in background — Response is returned immediately,
+      // events are written to controller as they happen (imoveis before text).
+      void runAgent(conversationMessages, encoder, controller).catch(err => {
+        const msg = err instanceof Error ? err.message : 'Erro interno.'
+        controller.enqueue(sseChunk(encoder, { type: 'error', message: msg }))
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
-      },
-    })
-    return new Response(fallbackStream, { headers: SSE_HEADERS })
+      })
+    },
+  })
 
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erro interno.'
-    return sseError(`Ocorreu um erro: ${msg}`)
-  }
+  return new Response(stream, { headers: SSE_HEADERS })
 }
