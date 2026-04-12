@@ -38,19 +38,25 @@ export function CorretorVirtual() {
         body: JSON.stringify({ messages: nextMessages }),
       })
 
+      if (!response.ok) throw new Error(`Erro ${response.status}`)
       if (!response.body) throw new Error('No response body')
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let assistantContent = ''
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n').filter(line => line.startsWith('data: '))
+      let buffer = ''
+      let done = false
+      while (!done) {
+        const result = await reader.read()
+        done = result.done
+        if (result.value) buffer += decoder.decode(result.value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''  // keep the potentially incomplete last line
+        let stop = false
         for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
           const data = line.slice(6)
-          if (data === '[DONE]') break
+          if (data === '[DONE]') { stop = true; break }
           try {
             const parsed = JSON.parse(data)
             if (typeof parsed === 'string') {
@@ -64,9 +70,10 @@ export function CorretorVirtual() {
               return updated
             })
           } catch {
-            // ignore parse errors on partial chunks
+            // ignore parse errors
           }
         }
+        if (stop) break
       }
     } catch {
       setMessages(prev => {
@@ -144,7 +151,8 @@ export function CorretorVirtual() {
                         <button
                           key={i}
                           onClick={() => sendMessage(text)}
-                          className="px-5 py-2.5 rounded-full border border-zinc-200 dark:border-white/10 bg-white/50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 hover:border-accent/40 text-[13px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-accent transition-all duration-300 shadow-sm"
+                          disabled={isLoading}
+                          className="px-5 py-2.5 rounded-full border border-zinc-200 dark:border-white/10 bg-white/50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 hover:border-accent/40 text-[13px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-accent transition-all duration-300 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {text}
                         </button>
@@ -201,6 +209,7 @@ export function CorretorVirtual() {
                     className="w-full h-14 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 rounded-2xl pl-6 pr-16 text-sm font-medium focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all outline-none disabled:opacity-60"
                   />
                   <button
+                    aria-label={isLoading ? 'Enviando...' : 'Enviar mensagem'}
                     onClick={() => sendMessage(input)}
                     disabled={isLoading || !input.trim()}
                     className="absolute right-2 top-2 h-10 w-10 flex items-center justify-center bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
