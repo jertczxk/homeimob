@@ -89,77 +89,104 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 }
 
 export async function POST(request: Request) {
-  const { messages } = await request.json() as { messages: OpenAI.Chat.ChatCompletionMessageParam[] }
+  const sseError = (msg: string) =>
+    new Response(`data: ${JSON.stringify({ error: msg })}\n\ndata: [DONE]\n\n`, {
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+    })
+
+  let messages: OpenAI.Chat.ChatCompletionMessageParam[]
+  try {
+    const body = await request.json() as { messages?: unknown }
+    if (!Array.isArray(body.messages)) return sseError('Mensagens inválidas.')
+    messages = body.messages as OpenAI.Chat.ChatCompletionMessageParam[]
+  } catch {
+    return sseError('Requisição inválida.')
+  }
 
   const conversationMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     ...messages,
   ]
 
-  // Agent loop: run until no more tool calls (max 5 iterations to prevent infinite loops)
-  let iterations = 0
-  while (iterations < 5) {
-    iterations++
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      messages: conversationMessages,
-      tools,
-      tool_choice: 'auto',
-      stream: false,
-    })
+  try {
+    // Agent loop: run until no more tool calls (max 5 iterations to prevent infinite loops)
+    let iterations = 0
+    while (iterations < 5) {
+      iterations++
+      const response = await client.chat.completions.create({
+        model: MODEL,
+        messages: conversationMessages,
+        tools,
+        tool_choice: 'auto',
+        stream: false,
+      })
 
-    const message = response.choices[0].message
+      const message = response.choices[0].message
 
-    if (!message.tool_calls || message.tool_calls.length === 0) {
-      // No tool calls — stream the final text response as SSE
-      const finalContent = message.content ?? ''
+      if (!message.tool_calls || message.tool_calls.length === 0) {
+        // No tool calls — stream the final text response as SSE
+        const finalContent = message.content ?? ''
 
-      const stream = new ReadableStream({
-        start(controller) {
-          const encoder = new TextEncoder()
-          const words = finalContent.split(' ')
-          let i = 0
+        const stream = new ReadableStream({
+          start(controller) {
+            const encoder = new TextEncoder()
+            const words = finalContent.split(' ')
+            let i = 0
 
-          function pushNext() {
-            if (i >= words.length) {
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-              controller.close()
-              return
+            function pushNext() {
+              if (i >= words.length) {
+                controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+                controller.close()
+                return
+              }
+              const chunk = (i === 0 ? '' : ' ') + words[i]
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
+              i++
+              setTimeout(pushNext, 12)
             }
-            const chunk = (i === 0 ? '' : ' ') + words[i]
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
-            i++
-            setTimeout(pushNext, 12)
-          }
 
-          pushNext()
-        },
-      })
+            pushNext()
+          },
+        })
 
-      return new Response(stream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        },
-      })
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+          },
+        })
+      }
+
+      // Has tool calls — execute them and add results
+      conversationMessages.push(message)
+
+      for (const toolCall of message.tool_calls) {
+        if (toolCall.type !== 'function') continue
+        const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
+        const result = await executeTool(toolCall.function.name, args)
+        conversationMessages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: result,
+        })
+      }
     }
 
-    // Has tool calls — execute them and add results
-    conversationMessages.push(message)
-
-    for (const toolCall of message.tool_calls) {
-      if (toolCall.type !== 'function') continue
-      const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
-      const result = await executeTool(toolCall.function.name, args)
-      conversationMessages.push({
-        role: 'tool',
-        tool_call_id: toolCall.id,
-        content: result,
-      })
-    }
+    // Stream a fallback message if loop limit is hit
+    const fallbackStream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder()
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify('Desculpe, não consegui processar sua solicitação. Tente novamente.')}\n\n`))
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+      },
+    })
+    return new Response(fallbackStream, {
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erro interno.'
+    return sseError(`Ocorreu um erro: ${msg}`)
   }
-
-  // Fallback if loop limit hit
-  return Response.json({ error: 'Agent loop limit reached' }, { status: 500 })
 }
