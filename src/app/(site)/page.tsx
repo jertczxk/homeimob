@@ -17,7 +17,7 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="relative w-full min-h-screen lg:h-screen lg:min-h-[850px] flex flex-col bg-zinc-950 overflow-visible lg:overflow-hidden">
+      <section className="relative w-full min-h-screen lg:min-h-[800px] flex flex-col bg-zinc-950 overflow-visible">
         {/* Background Image with optimized overlay */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-[20s] scale-110 animate-slow-zoom"
@@ -29,7 +29,7 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
 
-        <div className="container relative z-10 flex-1 flex flex-col justify-center pt-32 lg:pt-44">
+        <div className="container relative z-10 flex-1 flex flex-col justify-center pt-32 lg:pt-36">
           <div className="max-w-4xl space-y-16 animate-in fade-in slide-in-from-left-6 duration-1000">
 
             {/* Headlines */}
@@ -55,7 +55,7 @@ export default async function HomePage() {
         </div>
 
         {/* Bottom Hero: Stats Bar */}
-        <div className="w-full bg-zinc-950 lg:bg-white/5 backdrop-blur-2xl border-t border-white/5 py-16 lg:py-14 relative z-10 mt-auto">
+        <div className="w-full bg-zinc-950 lg:bg-white/5 backdrop-blur-2xl border-t border-white/5 py-10 lg:py-12 relative z-10 mt-auto">
           <div className="container">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
               {[

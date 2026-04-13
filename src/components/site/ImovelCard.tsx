@@ -5,13 +5,14 @@ import Link from 'next/link'
 import { BedDouble, Bath, Car, Maximize, MapPin, ArrowUpRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ImovelComFotos } from '@/types'
+import { PropertyPlaceholder } from '@/components/ui/PropertyPlaceholder'
 
 interface ImovelCardProps {
   imovel: ImovelComFotos
 }
 
 export function ImovelCard({ imovel }: ImovelCardProps) {
-  const thumbnail = imovel.imovel_fotos?.[0]?.url || '/placeholder-house.webp'
+  const thumbnail = imovel.imovel_fotos?.[0]?.url || '/placeholder-imovel.png'
 
   const formatPrice = (price: number | null) => {
     if (!price) return 'Sob Consulta'
@@ -57,13 +58,17 @@ export function ImovelCard({ imovel }: ImovelCardProps) {
           </div>
         )}
 
-        <Image
-          src={thumbnail}
-          alt={imovel.titulo}
-          fill
-          className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
+        {thumbnail !== '/placeholder-imovel.png' ? (
+          <Image
+            src={thumbnail}
+            alt={imovel.titulo}
+            fill
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        ) : (
+          <PropertyPlaceholder />
+        )}
 
         {/* Gradient: always present, darkens on hover */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-400" />

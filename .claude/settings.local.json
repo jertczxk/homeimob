@@ -16,7 +16,12 @@
       "Bash(grep \"\"openai\"\":*)",
       "Bash(\"C:/Users/João Gabriel/Documents/GitHub/homeimob/.worktrees/corretor-virtual/.env.local\":*)",
       "Bash(node:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(do:*)",
+      "Bash(python3:*)"
     ]
   }
 }

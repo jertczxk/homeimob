@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { SendHorizontal, Bot, BedDouble, Ruler, MapPin, Home } from 'lucide-react'
+import { SendHorizontal, Bot, BedDouble, Ruler, MapPin, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PropertyPlaceholder } from '@/components/ui/PropertyPlaceholder'
 
@@ -22,10 +22,20 @@ type ImovelCard = {
   foto: string | null
 }
 
+type ImoveisParams = {
+  cidade?: string
+  finalidade?: string
+  tipo?: string
+  quartos?: number
+  preco_max?: number
+  preco_min?: number
+}
+
 type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   imoveis?: ImovelCard[]
+  imoveisParams?: ImoveisParams
 }
 
 const suggestions = [
@@ -34,6 +44,18 @@ const suggestions = [
   'Apartamentos com 3 quartos até R$ 2M',
   'Quero simular um financiamento',
 ]
+
+function buildImoveisUrl(params: ImoveisParams): string {
+  const sp = new URLSearchParams()
+  if (params.cidade) sp.set('bairro', params.cidade)
+  if (params.finalidade) sp.set('finalidade', params.finalidade)
+  if (params.tipo) sp.set('tipo', params.tipo)
+  if (params.quartos) sp.set('quartos', String(params.quartos))
+  if (params.preco_max) sp.set('precoMax', String(params.preco_max))
+  if (params.preco_min) sp.set('precoMin', String(params.preco_min))
+  const qs = sp.toString()
+  return qs ? `/imoveis?${qs}` : '/imoveis'
+}
 
 function TypingDots() {
   return (
@@ -54,10 +76,10 @@ function PropertyCard({ imovel }: { imovel: ImovelCard }) {
     <Link
       href={imovel.link}
       target="_blank"
-      className="shrink-0 w-48 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-white/10 rounded-2xl overflow-hidden hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300 group/card"
+      className="shrink-0 w-52 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-white/10 rounded-2xl overflow-hidden hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300 group/card snap-start"
     >
       {/* Photo */}
-      <div className="relative h-28 bg-zinc-100 dark:bg-zinc-700 overflow-hidden">
+      <div className="relative h-32 bg-zinc-100 dark:bg-zinc-700 overflow-hidden">
         {imovel.foto ? (
           <Image
             src={imovel.foto}
@@ -102,6 +124,86 @@ function PropertyCard({ imovel }: { imovel: ImovelCard }) {
   )
 }
 
+function PropertyCarousel({ imoveis, params }: { imoveis: ImovelCard[]; params?: ImoveisParams }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    updateScrollState()
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    const ro = new ResizeObserver(updateScrollState)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateScrollState)
+      ro.disconnect()
+    }
+  }, [updateScrollState])
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir === 'left' ? -220 : 220, behavior: 'smooth' })
+  }
+
+  const imoveisUrl = params ? buildImoveisUrl(params) : '/imoveis'
+
+  return (
+    <div className="w-full space-y-2">
+      {/* Carousel */}
+      <div className="relative">
+        {/* Left arrow */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-7 h-7 flex items-center justify-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 rounded-full shadow-md hover:border-accent/40 transition-all"
+          >
+            <ChevronLeft className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-300" />
+          </button>
+        )}
+
+        {/* Scrollable row */}
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+        >
+          {imoveis.map((im, idx) => (
+            <PropertyCard key={idx} imovel={im} />
+          ))}
+        </div>
+
+        {/* Right arrow */}
+        {canScrollRight && (
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-7 h-7 flex items-center justify-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 rounded-full shadow-md hover:border-accent/40 transition-all"
+          >
+            <ChevronRight className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-300" />
+          </button>
+        )}
+      </div>
+
+      {/* Ver imóveis semelhantes */}
+      <Link
+        href={imoveisUrl}
+        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent hover:text-accent/80 transition-colors group/link"
+      >
+        Ver todos os imóveis semelhantes
+        <ArrowRight className="h-3 w-3 group-hover/link:translate-x-0.5 transition-transform" />
+      </Link>
+    </div>
+  )
+}
+
 export function CorretorVirtual() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -136,6 +238,7 @@ export function CorretorVirtual() {
       const decoder = new TextDecoder()
       let assistantContent = ''
       let imoveisData: ImovelCard[] | undefined
+      let imoveisParams: ImoveisParams | undefined
 
       let buffer = ''
       let done = false
@@ -155,6 +258,7 @@ export function CorretorVirtual() {
               type?: string
               chunk?: string
               data?: ImovelCard[]
+              params?: ImoveisParams
               message?: string
               error?: string
             }
@@ -162,6 +266,7 @@ export function CorretorVirtual() {
               assistantContent += parsed.chunk
             } else if (parsed.type === 'imoveis' && parsed.data) {
               imoveisData = parsed.data
+              imoveisParams = parsed.params
             } else if (parsed.type === 'error' || parsed.error) {
               assistantContent = parsed.message ?? parsed.error ?? 'Ocorreu um erro.'
             }
@@ -171,6 +276,7 @@ export function CorretorVirtual() {
                 role: 'assistant',
                 content: assistantContent,
                 imoveis: imoveisData,
+                imoveisParams,
               }
               return updated
             })
@@ -290,7 +396,7 @@ export function CorretorVirtual() {
                         </div>
                       )}
 
-                      <div className={cn('flex flex-col gap-3', msg.role === 'user' ? 'items-end max-w-[80%]' : 'items-start max-w-[85%]')}>
+                      <div className={cn('flex flex-col gap-3', msg.role === 'user' ? 'items-end max-w-[80%]' : 'items-start w-full max-w-[85%]')}>
                         {/* Bubble */}
                         <div
                           className={cn(
@@ -303,12 +409,10 @@ export function CorretorVirtual() {
                           {msg.content || <TypingDots />}
                         </div>
 
-                        {/* Property cards — horizontal scroll row */}
+                        {/* Property carousel */}
                         {msg.imoveis && msg.imoveis.length > 0 && (
-                          <div className="flex gap-3 overflow-x-auto pb-1 w-full max-w-[500px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                            {msg.imoveis.map((im, idx) => (
-                              <PropertyCard key={idx} imovel={im} />
-                            ))}
+                          <div className="w-full">
+                            <PropertyCarousel imoveis={msg.imoveis} params={msg.imoveisParams} />
                           </div>
                         )}
                       </div>
