@@ -43,8 +43,8 @@ OUTROS ASSUNTOS:
 function stripMarkdown(text: string): string {
   return text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url) → text
-    .replace(/\*\*(.+?)\*\*/gs, '$1')         // **bold**
-    .replace(/\*(.+?)\*/gs, '$1')              // *italic*
+    .replace(/\*\*([\s\S]+?)\*\*/g, '$1')      // **bold**
+    .replace(/\*([\s\S]+?)\*/g, '$1')         // *italic*
     .replace(/^#{1,6}\s+/gm, '')              // # headings
     .replace(/^[-*+]\s+/gm, '')               // bullet points
     .replace(/^\d+\.\s+/gm, '')               // numbered lists
@@ -54,7 +54,13 @@ function stripMarkdown(text: string): string {
 
 // Split text into sentences for natural streaming cadence
 function splitBySentences(text: string): string[] {
-  const parts = text.split(/(?<=[.!?])\s+/)
+  const parts = text.split(/([.!?])\s+/).reduce<string[]>((acc, part, i, arr) => {
+    if (i % 2 === 0) {
+      const punct = arr[i + 1] ?? ''
+      if (part) acc.push(part + punct)
+    }
+    return acc
+  }, [])
   return parts.filter(p => p.trim().length > 0)
 }
 

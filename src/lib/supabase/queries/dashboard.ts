@@ -11,25 +11,38 @@ export interface DashboardStats {
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient()
 
+  // Use a stable reference for "now"
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
   const [imoveisRes, pagamentosRes, leadsRes, receitaRes] = await Promise.all([
     supabase.from('imoveis').select('id', { count: 'exact', head: true }).eq('status', 'ativo'),
     supabase.from('pagamentos').select('id', { count: 'exact', head: true })
       .eq('status', 'pendente'),
     supabase.from('leads').select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
-    supabase.from('pagamentos').select('valor,created_at').eq('status', 'pago'),
+      .gte('created_at', startOfMonth.toISOString()),
+    // Fetch paid payments from the last 6 months
+    supabase.from('pagamentos')
+      .select('valor, data_pagamento')
+      .eq('status', 'pago')
+      .gte('data_pagamento', new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString()),
   ])
 
-  // Build last-6-months revenue
+  // Build last-6-months revenue buckets (using 1st of each month to avoid month-end issues)
   const months = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date()
-    d.setMonth(d.getMonth() - (5 - i))
-    return { mes: d.toLocaleString('pt-BR', { month: 'short' }), month: d.getMonth(), year: d.getFullYear(), valor: 0 }
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+    return {
+      mes: d.toLocaleString('pt-BR', { month: 'short' }),
+      monthIndex: d.getMonth(),
+      year: d.getFullYear(),
+      valor: 0
+    }
   })
 
   for (const p of receitaRes.data ?? []) {
-    const d = new Date(p.created_at)
-    const bucket = months.find(m => m.month === d.getMonth() && m.year === d.getFullYear())
+    if (!p.data_pagamento) continue
+    const d = new Date(p.data_pagamento)
+    const bucket = months.find(m => m.monthIndex === d.getMonth() && m.year === d.getFullYear())
     if (bucket) bucket.valor += p.valor
   }
 

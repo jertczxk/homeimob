@@ -57,17 +57,20 @@ export default async function PipelineVendasPage() {
 
       <div className="bg-zinc-800/30 rounded-2xl border border-white/5 p-5">
         <h3 className="text-sm font-semibold text-white mb-4">Funil de Vendas</h3>
-        <div className="flex items-end gap-2 h-32">
+        <div className="flex items-end gap-2 h-32 px-2">
           {stages.map(st => {
             const count = stageCounts[st.key]
             const pct = totalCount > 0 ? (count / totalCount) * 100 : 0
             return (
-              <div key={st.key} className="flex-1 flex flex-col items-center gap-1">
-                <span className="text-xs font-bold text-white">{count}</span>
-                <div className="w-full rounded-t-lg transition-all" style={{ height: `${Math.max(pct * 1.2, 8)}%` }}>
-                  <div className={cn('w-full h-full rounded-t-lg opacity-60', st.color)} />
+              <div key={st.key} className="flex-1 flex flex-col items-center h-full group relative">
+                <span className="text-[10px] font-bold text-white mb-1 h-4">{count}</span>
+                <div className="w-full flex-1 bg-white/5 rounded-t-lg overflow-hidden flex flex-col justify-end">
+                  <div
+                    className={cn('w-full rounded-t-lg transition-all duration-500', st.color)}
+                    style={{ height: `${Math.max(pct, 4)}%` }}
+                  />
                 </div>
-                <span className="text-[9px] text-zinc-500 text-center leading-tight">{st.label}</span>
+                <span className="text-[9px] text-zinc-500 text-center leading-tight mt-1 h-5 flex items-center">{st.label}</span>
               </div>
             )
           })}

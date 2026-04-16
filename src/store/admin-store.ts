@@ -15,7 +15,7 @@ interface AdminState {
 export const useAdminStore = create<AdminState>((set) => ({
   selectedLeadId: null,
   detailPanelOpen: false,
-  sidebarOpen: true,
+  sidebarOpen: false,
 
   selectLead: (leadId) =>
     set({ selectedLeadId: leadId, detailPanelOpen: leadId !== null }),

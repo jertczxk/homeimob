@@ -21,7 +21,12 @@
       "Bash(curl:*)",
       "WebFetch(domain:localhost)",
       "Bash(do:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(for f in \"C:\\\\Users\\\\João Gabriel\\\\Documents\\\\GitHub\\\\homeimob\\\\src\\\\app\\\\\\(admin\\)/admin/vendas/visitas/page.tsx\" \"C:\\\\Users\\\\João Gabriel\\\\Documents\\\\GitHub\\\\homeimob\\\\src\\\\app\\\\\\(admin\\)/admin/vendas/propostas/page.tsx\" \"C:\\\\Users\\\\João Gabriel\\\\Documents\\\\GitHub\\\\homeimob\\\\src\\\\app\\\\\\(admin\\)/admin/vendas/relatorios/page.tsx\" \"C:\\\\Users\\\\João Gabriel\\\\Documents\\\\GitHub\\\\homeimob\\\\src\\\\app\\\\\\(admin\\)/admin/vendas/captacao/page.tsx\" \"C:\\\\Users\\\\João Gabriel\\\\Documents\\\\GitHub\\\\homeimob\\\\src\\\\app\\\\\\(admin\\)/admin/locacoes/manutencoes/page.tsx\" \"C:\\\\Users\\\\João Gabriel\\\\Documents\\\\GitHub\\\\homeimob\\\\src\\\\app\\\\\\(admin\\)/admin/locacoes/vistorias/page.tsx\")",
+      "Read(//c/Users/João Gabriel/Documents/GitHub/homeimob/**)",
+      "Bash(done)",
+      "Bash(npm run:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

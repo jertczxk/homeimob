@@ -67,9 +67,9 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="max-w-[1200px]">
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar Tabs */}
-        <div className="w-56 shrink-0 space-y-1">
+        <div className="w-full lg:w-56 shrink-0 flex items-center lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-none no-scrollbar">
           {tabs.map(tab => {
             const Icon = tab.icon
             return (
@@ -77,7 +77,7 @@ export default function ConfiguracoesPage() {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors text-left',
+                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors text-left whitespace-nowrap lg:w-full',
                   activeTab === tab.key
                     ? 'bg-accent/10 text-accent'
                     : 'text-zinc-500 hover:text-white hover:bg-white/[0.03]'

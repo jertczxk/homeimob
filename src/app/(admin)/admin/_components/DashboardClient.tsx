@@ -69,22 +69,22 @@ function MiniChart({ data }: { data: { mes: string; valor: number }[] }) {
           R$ {lastValor > 0 ? (lastValor / 1000).toFixed(0) + 'k' : '0'}
         </p>
       </div>
-      <div className="flex items-end gap-2 h-32">
+      <div className="flex items-end gap-2 h-32 px-1">
         {data.map((item, i) => {
           const height = (item.valor / max) * 100
           const isLast = i === data.length - 1
           return (
-            <div key={item.mes} className="flex-1 flex flex-col items-center gap-2">
-              <div className="w-full relative group">
+            <div key={item.mes} className="flex-1 flex flex-col items-center h-full">
+              <div className="w-full flex-1 relative group flex flex-col justify-end">
                 <div
-                  className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? 'bg-accent' : 'bg-white/10 group-hover:bg-white/20'}`}
-                  style={{ height: `${height}%`, minHeight: '4px' }}
+                  className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? 'bg-accent' : 'bg-white/20 group-hover:bg-white/30'}`}
+                  style={{ height: `${Math.max(height, 2)}%` }}
                 />
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-700 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-700 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
                   R$ {(item.valor / 1000).toFixed(0)}k
                 </div>
               </div>
-              <span className="text-[10px] text-zinc-500">{item.mes}</span>
+              <span className="text-[10px] text-zinc-500 mt-2">{item.mes}</span>
             </div>
           )
         })}

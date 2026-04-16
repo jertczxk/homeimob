@@ -216,6 +216,7 @@ export function CorretorVirtual() {
     if (el) el.scrollTop = el.scrollHeight
   }, [messages])
 
+  
   async function sendMessage(text: string) {
     if (!text.trim() || isLoading) return
     const userMessage: ChatMessage = { role: 'user', content: text.trim() }

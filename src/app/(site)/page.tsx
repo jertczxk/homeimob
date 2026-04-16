@@ -29,7 +29,7 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
 
-        <div className="container relative z-10 flex-1 flex flex-col justify-center pt-32 lg:pt-36">
+        <div className="container relative z-30 flex-1 flex flex-col justify-center pt-32 lg:pt-36">
           <div className="max-w-4xl space-y-16 animate-in fade-in slide-in-from-left-6 duration-1000">
 
             {/* Headlines */}
@@ -45,7 +45,7 @@ export default async function HomePage() {
             </div>
 
             {/* Integrated Search Bar below headlines */}
-            <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300 relative z-20 pb-12 lg:pb-20">
+            <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300 relative z-40 pb-12 lg:pb-20">
               <div className="bg-white/5 backdrop-blur-3xl p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] border border-white/10 shadow-3xl relative group">
                 {/* Removed overflow-hidden to allow dropdowns to show and removed blocking absolute overlay */}
                 <FiltrosBusca />
